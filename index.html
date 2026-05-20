@@ -83,35 +83,12 @@
 </div>
 
 <script>
-  // GameDistribution allows third-party iframe embedding (verified: no X-Frame-Options, no CSP frame-ancestors).
-  // URL format: https://html5.gamedistribution.com/<id>/
-  // CrazyGames was removed because they now block embedding (401 + SAMEORIGIN).
+  // Self-hosted games: each lives at games/<path>/index.html in this same repo.
+  // No third-party providers — bulletproof, can never be blocked.
   const GAMES = [
-    { id: "f6c198ea49464c2ebe2558c89d1e1ee1", name: "Drift Cars" },
-    { id: "2dee9d404697435aa76111eb4015e1d5", name: "Merge Fruit" },
-    { id: "27673bc45d2e4b27b7cd24e422f7c257", name: "Bubble Game 3" },
-    { id: "7603768da9df4e1eb3849a88af32be84", name: "1010! Block Puzzle" },
-    { id: "134db518698b45bc80e27e466b14345b", name: "Checkers" },
-    { id: "20fa5406b00643128250478502fa5453", name: "8 Ball Pro" },
-    { id: "587cc8f8b84b484f9267a7ec1caa5328", name: "Pool 8 Ball" },
-    { id: "5599daed64d9456992f9029945544e1d", name: "3D Billiard 8 Ball Pool" },
-    { id: "c812b37e92cc419a87c00e3d33a90e33", name: "Classic Car Parking 3D" },
-    { id: "55687da035f245aeb3945e358fb3fd59", name: "Real Car Parking" },
-    { id: "0418077834c04165806f432b5d4b2117", name: "Moto Bike Racing 3D" },
-    { id: "61b7b8e7e9414c80997a2e72190407d2", name: "2 Player Battle Car Racing" },
-    { id: "347d3d5f72aa46e9bdd88052351a6d85", name: "Extreme Bike Race" },
-    { id: "06be3a6f9a984ac3b83db72147f5cbc4", name: "Endless Runner 3D" },
-    { id: "825d01cfa9424d43a34088cc8753454a", name: "Endless Jump" },
-    { id: "9b634d67ddd6407c95effd409b947a76", name: "Geometry Jump" },
-    { id: "6729f660517a479ab2edf32d4665800e", name: "Stickman Shooter" },
-    { id: "d293147adac449bd9e4d8f5934f8252e", name: "Stickman Shooter 2" },
-    { id: "b2626cb4ee884e8881b2420f6fbf4107", name: "Counter Terror Shooter" },
-    { id: "1d7959f081b4453498ee9916b693988c", name: "Stick Duel Battle" },
-    { id: "7f27295d85f24a16b0a9eb5df0f94fb1", name: "Tower Defense 2D" },
-    { id: "d4ac0ead7ff5403eb3aa6ab620b0b959", name: "Gold Tower Defense" },
-    { id: "c87a32902f7f486bbd639514cfa5cb58", name: "Zombie Idle Defense" },
-    { id: "1ef5c12b5e444677af3ee61f63970988", name: "Ship Clicker" },
-    { id: "514c03c52b9d4cfd8a2df0490b17db6d", name: "Club Tycoon: Idle Clicker" },
+    { path: "2048",   name: "2048" },
+    { path: "snake",  name: "Snake" },
+    { path: "tetris", name: "Tetris" },
   ];
 
   const grid = document.getElementById("grid");
@@ -138,7 +115,7 @@
 
   function play(g) {
     playerTitle.textContent = g.name;
-    frame.src = `https://html5.gamedistribution.com/${g.id}/`;
+    frame.src = `games/${g.path}/`;
     player.classList.add("open");
   }
 

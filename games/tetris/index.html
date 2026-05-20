@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Tetris</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: #0e0f13; color: #eee; font-family: system-ui, sans-serif; touch-action: none; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 16px; gap: 12px; }
+  h1 { margin: 0; font-size: 28px; font-weight: 800; color: #60a5fa; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .badge { background: #15171d; border: 1px solid #23262e; padding: 6px 12px; border-radius: 6px; font-size: 13px; }
+  .badge b { color: #60a5fa; }
+  button { padding: 8px 14px; background: #2a2d36; border: 0; border-radius: 6px; color: #eee; cursor: pointer; font-size: 13px; }
+  button:hover { background: #353944; }
+  canvas { background: #15171d; border: 1px solid #23262e; border-radius: 8px; max-width: 100%; touch-action: none; }
+  .hint { font-size: 12px; color: #888; max-width: 360px; text-align: center; }
+  .touch-pad { display: none; gap: 8px; margin-top: 6px; }
+  .touch-pad button { width: 56px; height: 44px; font-size: 18px; }
+  @media (pointer: coarse) { .touch-pad { display: flex; } }
+</style>
+</head>
+<body>
+  <h1>Tetris</h1>
+  <div class="row">
+    <div class="badge">Score: <b id="score">0</b></div>
+    <div class="badge">Lines: <b id="lines">0</b></div>
+    <div class="badge">Level: <b id="level">1</b></div>
+    <button onclick="reset()">New Game</button>
+  </div>
+  <canvas id="cv" width="240" height="480"></canvas>
+  <div class="touch-pad">
+    <button ontouchstart="move(-1,0);event.preventDefault()" onclick="move(-1,0)">◀</button>
+    <button ontouchstart="rotate();event.preventDefault()" onclick="rotate()">⟳</button>
+    <button ontouchstart="move(1,0);event.preventDefault()" onclick="move(1,0)">▶</button>
+    <button ontouchstart="move(0,1);event.preventDefault()" onclick="move(0,1)">▼</button>
+    <button ontouchstart="hardDrop();event.preventDefault()" onclick="hardDrop()">⏬</button>
+  </div>
+  <div class="hint">Arrow keys: move/rotate. Down: soft drop. Space: hard drop.</div>
+
+<script>
+  const cv = document.getElementById("cv");
+  const ctx = cv.getContext("2d");
+  const COLS = 10, ROWS = 20, CELL = 24;
+
+  const PIECES = {
+    I: { shape: [[1,1,1,1]],                 color: "#06b6d4" },
+    O: { shape: [[1,1],[1,1]],               color: "#facc15" },
+    T: { shape: [[0,1,0],[1,1,1]],           color: "#a855f7" },
+    S: { shape: [[0,1,1],[1,1,0]],           color: "#22c55e" },
+    Z: { shape: [[1,1,0],[0,1,1]],           color: "#ef4444" },
+    L: { shape: [[0,0,1],[1,1,1]],           color: "#f97316" },
+    J: { shape: [[1,0,0],[1,1,1]],           color: "#3b82f6" },
+  };
+  const KEYS = Object.keys(PIECES);
+
+  let board, current, score, lines, level, dropTimer, dropInterval, dead;
+
+  function reset() {
+    board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+    score = 0; lines = 0; level = 1;
+    dead = false;
+    dropInterval = 600;
+    spawn();
+    updateHud();
+    draw();
+    if (dropTimer) clearInterval(dropTimer);
+    dropTimer = setInterval(tick, dropInterval);
+  }
+
+  function spawn() {
+    const k = KEYS[Math.floor(Math.random() * KEYS.length)];
+    const p = PIECES[k];
+    current = {
+      shape: p.shape.map(r => r.slice()),
+      color: p.color,
+      x: Math.floor((COLS - p.shape[0].length) / 2),
+      y: 0,
+    };
+    if (collides(current.shape, current.x, current.y)) {
+      dead = true;
+      clearInterval(dropTimer); dropTimer = null;
+      draw();
+    }
+  }
+
+  function collides(shape, x, y) {
+    for (let r = 0; r < shape.length; r++) for (let c = 0; c < shape[r].length; c++) {
+      if (!shape[r][c]) continue;
+      const nx = x + c, ny = y + r;
+      if (nx < 0 || nx >= COLS || ny >= ROWS) return true;
+      if (ny >= 0 && board[ny][nx]) return true;
+    }
+    return false;
+  }
+
+  function merge() {
+    for (let r = 0; r < current.shape.length; r++) for (let c = 0; c < current.shape[r].length; c++) {
+      if (current.shape[r][c]) {
+        const ny = current.y + r, nx = current.x + c;
+        if (ny >= 0) board[ny][nx] = current.color;
+      }
+    }
+  }
+
+  function clearLines() {
+    let cleared = 0;
+    for (let r = ROWS - 1; r >= 0; r--) {
+      if (board[r].every(c => c)) {
+        board.splice(r, 1);
+        board.unshift(Array(COLS).fill(null));
+        cleared++;
+        r++;
+      }
+    }
+    if (cleared) {
+      const points = [0, 100, 300, 500, 800][cleared] * level;
+      score += points;
+      lines += cleared;
+      const newLevel = Math.floor(lines / 10) + 1;
+      if (newLevel !== level) {
+        level = newLevel;
+        dropInterval = Math.max(80, 600 - (level - 1) * 50);
+        clearInterval(dropTimer);
+        dropTimer = setInterval(tick, dropInterval);
+      }
+      updateHud();
+    }
+  }
+
+  function updateHud() {
+    document.getElementById("score").textContent = score;
+    document.getElementById("lines").textContent = lines;
+    document.getElementById("level").textContent = level;
+  }
+
+  function tick() { move(0, 1); }
+
+  function move(dx, dy) {
+    if (dead) return;
+    const nx = current.x + dx, ny = current.y + dy;
+    if (!collides(current.shape, nx, ny)) {
+      current.x = nx; current.y = ny;
+      draw();
+    } else if (dy > 0) {
+      merge();
+      clearLines();
+      spawn();
+      draw();
+    }
+  }
+
+  function rotate() {
+    if (dead) return;
+    const s = current.shape;
+    const rotated = s[0].map((_, c) => s.map(r => r[c]).reverse());
+    if (!collides(rotated, current.x, current.y)) {
+      current.shape = rotated;
+      draw();
+    } else if (!collides(rotated, current.x - 1, current.y)) {
+      current.shape = rotated; current.x--;
+      draw();
+    } else if (!collides(rotated, current.x + 1, current.y)) {
+      current.shape = rotated; current.x++;
+      draw();
+    }
+  }
+
+  function hardDrop() {
+    if (dead) return;
+    while (!collides(current.shape, current.x, current.y + 1)) current.y++;
+    move(0, 1);
+  }
+
+  function draw() {
+    ctx.fillStyle = "#15171d";
+    ctx.fillRect(0, 0, cv.width, cv.height);
+
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      if (board[r][c]) drawCell(c, r, board[r][c]);
+    }
+
+    if (current && !dead) {
+      for (let r = 0; r < current.shape.length; r++) for (let c = 0; c < current.shape[r].length; c++) {
+        if (current.shape[r][c]) drawCell(current.x + c, current.y + r, current.color);
+      }
+    }
+
+    if (dead) {
+      ctx.fillStyle = "rgba(0,0,0,0.7)";
+      ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 22px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("Game Over", cv.width / 2, cv.height / 2 - 6);
+      ctx.font = "13px system-ui";
+      ctx.fillText("Score: " + score, cv.width / 2, cv.height / 2 + 16);
+    }
+  }
+
+  function drawCell(c, r, color) {
+    const x = c * CELL, y = r * CELL;
+    ctx.fillStyle = color;
+    ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
+    ctx.strokeStyle = "rgba(255,255,255,0.15)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
+  }
+
+  document.addEventListener("keydown", e => {
+    const k = e.key;
+    if (k === "ArrowLeft") move(-1, 0);
+    else if (k === "ArrowRight") move(1, 0);
+    else if (k === "ArrowDown") move(0, 1);
+    else if (k === "ArrowUp") rotate();
+    else if (k === " ") hardDrop();
+    else return;
+    e.preventDefault();
+  });
+
+  reset();
+</script>
+</body>
+</html>
