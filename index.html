@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Games</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: #0e0f13; color: #eee; font-family: system-ui, sans-serif; }
+
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px; background: #15171d; border-bottom: 1px solid #23262e;
+    position: sticky; top: 0; z-index: 10;
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header input {
+    flex: 1; max-width: 320px; padding: 8px 12px;
+    background: #0e0f13; border: 1px solid #2a2d36; border-radius: 6px;
+    color: #eee; font-size: 14px; outline: none;
+  }
+  header input:focus { border-color: #4a90e2; }
+  header button {
+    padding: 8px 14px; background: #2a2d36; border: 0; border-radius: 6px;
+    color: #eee; cursor: pointer; font-size: 14px;
+  }
+  header button:hover { background: #353944; }
+
+  .grid {
+    display: grid; gap: 14px; padding: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+  .card {
+    background: #15171d; border: 1px solid #23262e; border-radius: 10px;
+    overflow: hidden; cursor: pointer; transition: transform .12s, border-color .12s;
+  }
+  .card:hover { transform: translateY(-2px); border-color: #4a90e2; }
+  .card .thumb {
+    aspect-ratio: 16/10; background: #23262e center/cover no-repeat;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 700; color: #4a90e2;
+  }
+  .card .name {
+    padding: 10px 12px; font-size: 14px; font-weight: 500;
+  }
+
+  #player {
+    position: fixed; inset: 0; background: #000; z-index: 100;
+    display: none; flex-direction: column;
+  }
+  #player.open { display: flex; }
+  #player .bar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 12px; background: #15171d; border-bottom: 1px solid #23262e;
+  }
+  #player .bar .title { flex: 1; font-size: 14px; font-weight: 500; }
+  #player .bar button {
+    padding: 6px 12px; background: #2a2d36; border: 0; border-radius: 6px;
+    color: #eee; cursor: pointer; font-size: 13px;
+  }
+  #player .bar button:hover { background: #353944; }
+  #player iframe { flex: 1; width: 100%; border: 0; background: #000; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Games</h1>
+  <input id="search" type="text" placeholder="Search…" autocomplete="off">
+  <button onclick="cloak()" title="Open in about:blank">Cloak</button>
+</header>
+
+<div class="grid" id="grid"></div>
+
+<div id="player">
+  <div class="bar">
+    <div class="title" id="playerTitle"></div>
+    <button onclick="fs()">Fullscreen</button>
+    <button onclick="closePlayer()">Close</button>
+  </div>
+  <iframe id="frame" allow="autoplay; fullscreen; gamepad; pointer-lock; cross-origin-isolated" allowfullscreen></iframe>
+</div>
+
+<script>
+  // CrazyGames allows iframe embedding via /embed/<slug>
+  const GAMES = [
+    { slug: "moto-x3m",            name: "Moto X3M" },
+    { slug: "slope",               name: "Slope" },
+    { slug: "2048",                name: "2048" },
+    { slug: "cubes-2048-io",       name: "Cubes 2048.io" },
+    { slug: "smash-karts",         name: "Smash Karts" },
+    { slug: "uno-online",          name: "UNO Online" },
+    { slug: "8-ball-pool-with-buddies", name: "8 Ball Pool" },
+    { slug: "basketball-stars",    name: "Basketball Stars" },
+    { slug: "google-snake",        name: "Google Snake" },
+    { slug: "tetris",              name: "Tetris" },
+    { slug: "run-3",               name: "Run 3" },
+    { slug: "drift-hunters",       name: "Drift Hunters" },
+    { slug: "geometry-dash",       name: "Geometry Dash" },
+    { slug: "happy-wheels",        name: "Happy Wheels" },
+    { slug: "shell-shockers",      name: "Shell Shockers" },
+    { slug: "1v1-lol",             name: "1v1.LOL" },
+    { slug: "krunker-io",          name: "Krunker.io" },
+    { slug: "paper-io-2",          name: "Paper.io 2" },
+    { slug: "agar-io",             name: "Agar.io" },
+    { slug: "diep-io",             name: "Diep.io" },
+    { slug: "stickman-hook",       name: "Stickman Hook" },
+    { slug: "tunnel-rush",         name: "Tunnel Rush" },
+    { slug: "rooftop-snipers",     name: "Rooftop Snipers" },
+    { slug: "stick-merge",         name: "Stick Merge" },
+  ];
+
+  const grid = document.getElementById("grid");
+  const search = document.getElementById("search");
+  const player = document.getElementById("player");
+  const frame = document.getElementById("frame");
+  const playerTitle = document.getElementById("playerTitle");
+
+  function render(filter = "") {
+    const f = filter.trim().toLowerCase();
+    grid.innerHTML = "";
+    for (const g of GAMES) {
+      if (f && !g.name.toLowerCase().includes(f)) continue;
+      const card = document.createElement("div");
+      card.className = "card";
+      card.onclick = () => play(g);
+      card.innerHTML = `
+        <div class="thumb">${g.name.split(" ").map(w => w[0]).slice(0,2).join("")}</div>
+        <div class="name">${g.name}</div>
+      `;
+      grid.appendChild(card);
+    }
+  }
+
+  function play(g) {
+    playerTitle.textContent = g.name;
+    frame.src = `https://www.crazygames.com/embed/${g.slug}`;
+    player.classList.add("open");
+  }
+
+  function closePlayer() {
+    player.classList.remove("open");
+    frame.src = "about:blank";
+  }
+
+  function fs() {
+    if (frame.requestFullscreen) frame.requestFullscreen();
+  }
+
+  function cloak() {
+    const w = window.open("about:blank", "_blank");
+    if (!w) { alert("Allow popups for this site."); return; }
+    w.document.write(`<!DOCTYPE html><html><head><title>about:blank</title>
+      <link rel="icon" href="data:,">
+      <style>html,body,iframe{margin:0;padding:0;border:0;width:100vw;height:100vh;overflow:hidden;}</style>
+      </head><body><iframe src="${location.href}" allowfullscreen allow="autoplay; fullscreen; gamepad; pointer-lock"></iframe></body></html>`);
+    w.document.close();
+  }
+
+  search.oninput = e => render(e.target.value);
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closePlayer(); });
+
+  render();
+</script>
+
+</body>
+</html>
