@@ -26,6 +26,11 @@
     color: #eee; cursor: pointer; font-size: 14px;
   }
   header button:hover { background: #353944; }
+  header .btn-link {
+    padding: 8px 14px; background: #4a90e2; color: #fff; text-decoration: none;
+    border-radius: 6px; font-size: 14px; font-weight: 500;
+  }
+  header .btn-link:hover { background: #5aa3f0; }
 
   .grid {
     display: grid; gap: 14px; padding: 16px;
@@ -68,6 +73,7 @@
 <header>
   <h1>Games</h1>
   <input id="search" type="text" placeholder="Search…" autocomplete="off">
+  <a class="btn-link" href="https://monkeygg2.github.io/" target="_blank" rel="noopener" title="150+ more games (opens in new tab)">More Games ↗</a>
   <button onclick="cloak()" title="Open in about:blank">Cloak</button>
 </header>
 
