@@ -92,6 +92,8 @@
   // Self-hosted games: each lives at games/<path>/index.html in this same repo.
   // No third-party providers — bulletproof, can never be blocked.
   const GAMES = [
+    { name: "Turbo Rider (3D Bike)", url: "motorbike.html",  icon: "🏍️" },
+    { name: "Block Game Maker",      url: "game-maker.html", icon: "🧩" },
     { path: "2048",   name: "2048" },
     { path: "snake",  name: "Snake" },
     { path: "tetris", name: "Tetris" },
@@ -112,7 +114,7 @@
       card.className = "card";
       card.onclick = () => play(g);
       card.innerHTML = `
-        <div class="thumb">${g.name.split(" ").map(w => w[0]).slice(0,2).join("")}</div>
+        <div class="thumb">${g.icon || g.name.split(" ").map(w => w[0]).slice(0,2).join("")}</div>
         <div class="name">${g.name}</div>
       `;
       grid.appendChild(card);
@@ -121,7 +123,7 @@
 
   function play(g) {
     playerTitle.textContent = g.name;
-    frame.src = `games/${g.path}/`;
+    frame.src = g.url ? g.url : `games/${g.path}/`;
     player.classList.add("open");
   }
 
