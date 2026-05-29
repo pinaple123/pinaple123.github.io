@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>🏍️ Turbo Rider — 3D Motorbike</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0a0e1a;font-family:system-ui,Segoe UI,Roboto,sans-serif;color:#fff;-webkit-user-select:none;user-select:none}
+  #c{display:block;width:100vw;height:100vh}
+  .hud{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;padding:14px 18px;pointer-events:none;text-shadow:0 2px 6px #000a;font-weight:800}
+  .hud .box{background:#0006;backdrop-filter:blur(4px);border-radius:12px;padding:8px 14px;display:flex;gap:18px;align-items:baseline}
+  .hud .lab{font-size:11px;font-weight:700;letter-spacing:1px;color:#9fb4d8;text-transform:uppercase;margin-right:5px}
+  .hud .val{font-size:22px}
+  .spd .val{font-size:30px;color:#ffd24a}
+  .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;background:radial-gradient(circle at 50% 35%,#13203fcc,#070b15ee);z-index:5}
+  .overlay.hidden{display:none}
+  .overlay h1{font-size:clamp(34px,9vw,76px);margin:0;letter-spacing:2px;text-shadow:0 4px 0 #c0152e,0 6px 20px #000}
+  .overlay h1 small{display:block;font-size:.32em;letter-spacing:6px;color:#ffd24a;text-shadow:none;margin-top:6px}
+  .overlay p{font-size:16px;color:#c6d3ec;max-width:420px;line-height:1.6;margin:4px 16px}
+  .key{display:inline-block;background:#fff2;border:1px solid #fff4;border-radius:7px;padding:1px 9px;font-weight:700;margin:0 2px}
+  .btn{pointer-events:auto;cursor:pointer;border:0;border-radius:14px;padding:16px 40px;font:inherit;font-size:22px;font-weight:800;letter-spacing:1px;color:#08111f;background:linear-gradient(#ffe27a,#ffc23a);box-shadow:0 6px 0 #b87e12,0 10px 24px #000a}
+  .btn:active{transform:translateY(4px);box-shadow:0 2px 0 #b87e12}
+  .score-big{font-size:54px;font-weight:900;color:#ffd24a;text-shadow:0 3px 12px #000}
+  .muteBtn{position:fixed;bottom:14px;right:14px;z-index:6;pointer-events:auto;cursor:pointer;background:#0007;border:1px solid #fff3;color:#fff;border-radius:50%;width:46px;height:46px;font-size:20px}
+  /* touch steer zones */
+  .touchz{position:fixed;top:0;bottom:0;width:38%;z-index:4;display:none}
+  .touchz#tl{left:0} .touchz#tr{right:0}
+  @media (pointer:coarse){ .touchz{display:block} .tiponly{display:none} }
+  .credit{position:fixed;bottom:12px;left:14px;font-size:11px;color:#6f7fa0;z-index:6}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="hud" id="hud" style="opacity:0">
+  <div class="box spd"><span><span class="lab">Speed</span><span class="val" id="vSpeed">0</span> <span style="font-size:12px;color:#9fb4d8">km/h</span></span></div>
+  <div class="box">
+    <span><span class="lab">Dist</span><span class="val" id="vDist">0</span><span style="font-size:12px;color:#9fb4d8">m</span></span>
+    <span><span class="lab">Coins</span><span class="val" id="vCoins" style="color:#ffd24a">0</span></span>
+    <span><span class="lab">Best</span><span class="val" id="vBest">0</span></span>
+  </div>
+</div>
+
+<div class="overlay" id="ready">
+  <h1>TURBO RIDER<small>3D MOTORBIKE</small></h1>
+  <p class="tiponly"><span class="key">←</span><span class="key">→</span> or <span class="key">A</span><span class="key">D</span> to steer &nbsp;·&nbsp; <span class="key">↑</span>/<span class="key">Space</span> to boost</p>
+  <p>Weave through traffic, grab coins, and don't crash. It only gets faster. 🏁</p>
+  <button class="btn" id="startBtn">▶ RIDE</button>
+</div>
+
+<div class="overlay hidden" id="over">
+  <h1 style="text-shadow:0 4px 0 #444,0 6px 20px #000">CRASHED!</h1>
+  <div class="score-big"><span id="finalDist">0</span> m</div>
+  <p>Coins: <b id="finalCoins" style="color:#ffd24a">0</b> &nbsp;·&nbsp; Best: <b id="finalBest">0</b> m</p>
+  <button class="btn" id="againBtn">↺ RIDE AGAIN</button>
+</div>
+
+<button class="muteBtn" id="muteBtn" title="sound">🔊</button>
+<div class="touchz" id="tl"></div>
+<div class="touchz" id="tr"></div>
+<div class="credit">Turbo Rider · built with Three.js</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+/* ---------- constants ---------- */
+const ROAD_HALF = 7;          // bike stays within +/- this
+const SPAWN_FAR = 165;        // recycle distance ahead
+const RECYCLE_BACK = -18;
+const STEER_SPEED = 13;       // sideways units/sec
+const MAX_SPEED = 78, START_SPEED = 26, ACCEL = 1.1, BOOST = 26;
+const SKY = 0x9fd3ff;
+
+/* ---------- renderer / scene ---------- */
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(SKY);
+scene.fog = new THREE.Fog(SKY, 55, 150);
+
+const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 400);
+
+function resize(){
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w/h; camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize); resize();
+
+/* ---------- lights ---------- */
+scene.add(new THREE.HemisphereLight(0xffffff, 0x4a6a3a, 0.95));
+const sun = new THREE.DirectionalLight(0xffffff, 1.15);
+sun.position.set(-8, 18, -6);
+scene.add(sun);
+
+/* ---------- ground / road ---------- */
+const grass = new THREE.Mesh(
+  new THREE.PlaneGeometry(400, 600),
+  new THREE.MeshStandardMaterial({color:0x4f8a3a, roughness:1}));
+grass.rotation.x = -Math.PI/2; grass.position.z = 60; scene.add(grass);
+
+const road = new THREE.Mesh(
+  new THREE.PlaneGeometry(ROAD_HALF*2+2, 600),
+  new THREE.MeshStandardMaterial({color:0x33363d, roughness:0.95}));
+road.rotation.x = -Math.PI/2; road.position.set(0, 0.01, 60); scene.add(road);
+
+// solid edge lines
+for (const sx of [-(ROAD_HALF+0.4), (ROAD_HALF+0.4)]) {
+  const line = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 600),
+    new THREE.MeshStandardMaterial({color:0xf3d23a, roughness:0.6}));
+  line.rotation.x = -Math.PI/2; line.position.set(sx, 0.02, 60); scene.add(line);
+}
+
+/* ---------- recyclable arrays ---------- */
+const movers = [];   // {mesh, kind, ...}
+const rand = (a,b)=>a+Math.random()*(b-a);
+
+// center dashes (even spacing)
+const DASH_N = 22, DASH_GAP = 7;
+for (let i=0;i<DASH_N;i++){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 3.2),
+    new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.6}));
+  m.rotation.x = -Math.PI/2; m.position.set(0, 0.03, RECYCLE_BACK + i*DASH_GAP);
+  scene.add(m); movers.push({mesh:m, kind:'dash'});
+}
+
+// trees on both sides
+function buildTree(){
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.3,1.4,6),
+    new THREE.MeshStandardMaterial({color:0x6b4423, roughness:1}));
+  trunk.position.y = 0.7; g.add(trunk);
+  const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.3, 3, 8),
+    new THREE.MeshStandardMaterial({color:0x2f7d34, roughness:1}));
+  leaves.position.y = 2.6; g.add(leaves);
+  return g;
+}
+for (let i=0;i<20;i++){
+  const t = buildTree();
+  const side = i%2 ? 1 : -1;
+  t.position.set(side*rand(ROAD_HALF+4, ROAD_HALF+16), 0, rand(0, SPAWN_FAR));
+  const s = rand(0.8,1.7); t.scale.set(s,s,s);
+  scene.add(t); movers.push({mesh:t, kind:'tree', side});
+}
+
+// traffic cars
+function buildCar(color){
+  const g = new THREE.Group();
+  const m = c=>new THREE.MeshStandardMaterial({color:c, roughness:0.45, metalness:0.35});
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.7, 3.4), m(color));
+  body.position.y = 0.65; g.add(body);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.65, 1.7), m(0x223044));
+  cab.position.set(0, 1.2, -0.1); g.add(cab);
+  for (const dx of [-0.8,0.8]) for (const dz of [1.1,-1.1]){
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.42,0.3,14),
+      new THREE.MeshStandardMaterial({color:0x0c0c10, roughness:0.8}));
+    w.rotation.z = Math.PI/2; w.position.set(dx, 0.42, dz); g.add(w);
+  }
+  // tail lights (facing the player, since cars come toward us = -z)
+  for (const dx of [-0.6,0.6]){
+    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.18,0.08),
+      new THREE.MeshStandardMaterial({color:0xff3322, emissive:0xff2200, emissiveIntensity:1}));
+    tl.position.set(dx, 0.7, -1.72); g.add(tl);
+  }
+  return g;
+}
+const CAR_COLORS = [0x2b7de9,0xe8b13a,0x9b59b6,0x16a085,0xe74c3c,0xecf0f1,0xff7043];
+for (let i=0;i<8;i++){
+  const car = buildCar(CAR_COLORS[i%CAR_COLORS.length]);
+  car.position.set(laneX(), 0, 35 + i*16 + rand(0,8));
+  scene.add(car); movers.push({mesh:car, kind:'car'});
+}
+function laneX(){ return Math.round(rand(-1,1)*3)*1.9; } // loose lanes
+
+// coins
+function buildCoin(){
+  const c = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.16, 10, 18),
+    new THREE.MeshStandardMaterial({color:0xffd24a, emissive:0x6b4e00, metalness:0.7, roughness:0.3}));
+  return c;
+}
+for (let i=0;i<7;i++){
+  const c = buildCoin();
+  c.position.set(rand(-5,5), 1.1, 50 + i*22 + rand(0,12));
+  scene.add(c); movers.push({mesh:c, kind:'coin'});
+}
+
+/* ---------- bike ---------- */
+function buildBike(){
+  const g = new THREE.Group();
+  const wheels = [];
+  const mat = (c,o)=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:0.5,metalness:0.35},o));
+  const wheelMat = mat(0x111114,{roughness:0.85,metalness:0.1});
+  const chrome = mat(0x9aa0aa,{metalness:0.85,roughness:0.3});
+  for (const z of [1.05,-1.15]){
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.55,0.26,22), wheelMat);
+    w.rotation.z = Math.PI/2; w.position.set(0,0.55,z); g.add(w); wheels.push(w);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.17,0.17,0.28,10), chrome);
+    hub.rotation.z = Math.PI/2; hub.position.set(0,0.55,z); g.add(hub); wheels.push(hub);
+  }
+  g.add(meshAt(new THREE.BoxGeometry(0.5,0.45,2.1), mat(0xd2273a), 0,0.95,0));
+  g.add(meshAt(new THREE.BoxGeometry(0.62,0.4,0.95), mat(0xe23b4d), 0,1.18,0.18));
+  g.add(meshAt(new THREE.BoxGeometry(0.55,0.18,0.85), mat(0x18181c,{metalness:0.1}), 0,1.12,-0.78));
+  g.add(meshAt(new THREE.BoxGeometry(0.56,0.5,0.4), mat(0xd2273a), 0,1.05,1.05));
+  const light = meshAt(new THREE.SphereGeometry(0.16,12,12),
+    new THREE.MeshStandardMaterial({color:0xffffcc,emissive:0xffffaa,emissiveIntensity:1.5}), 0,1.05,1.28);
+  g.add(light);
+  const bar = meshAt(new THREE.CylinderGeometry(0.05,0.05,0.95,8), chrome, 0,1.36,1.02); bar.rotation.z=Math.PI/2; g.add(bar);
+  // rider
+  const suit = mat(0x222831,{metalness:0.1,roughness:0.7});
+  const torso = meshAt(new THREE.CapsuleGeometry(0.28,0.5,4,8), suit, 0,1.78,-0.2); torso.rotation.x=0.5; g.add(torso);
+  g.add(meshAt(new THREE.SphereGeometry(0.26,16,16), mat(0x2b6cb0,{metalness:0.3,roughness:0.4}), 0,2.22,0.06));
+  g.add(meshAt(new THREE.BoxGeometry(0.34,0.12,0.12), mat(0x111,{metalness:0.6,roughness:0.2}), 0,2.2,0.3));
+  for (const sx of [-0.27,0.27]){ const a=meshAt(new THREE.CapsuleGeometry(0.09,0.55,4,6), suit, sx,1.66,0.45); a.rotation.x=-0.95; g.add(a); }
+  for (const sx of [-0.2,0.2]){ const l=meshAt(new THREE.CapsuleGeometry(0.12,0.5,4,6), suit, sx,1.18,-0.55); l.rotation.x=0.6; g.add(l); }
+  g.userData.wheels = wheels;
+  return g;
+}
+function meshAt(geo,mat,x,y,z){ const m=new THREE.Mesh(geo,mat); m.position.set(x,y,z); return m; }
+
+const bike = buildBike();
+scene.add(bike);
+
+// soft blob shadow under bike
+const shadow = new THREE.Mesh(new THREE.CircleGeometry(1.2, 24),
+  new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:0.32}));
+shadow.rotation.x = -Math.PI/2; shadow.position.y = 0.04; scene.add(shadow);
+
+/* ---------- input ---------- */
+const keys = new Set();
+let touchSteer = 0;            // -1 / 0 / 1 from touch zones
+addEventListener('keydown', e=>{
+  const k = e.key.toLowerCase();
+  if (['arrowleft','arrowright','arrowup',' ','a','d'].includes(k)) e.preventDefault();
+  keys.add(k);
+  if (state==='ready') start();
+  else if (state==='over' && (k==='r'||k===' '||k==='enter')) start();
+});
+addEventListener('keyup', e=>keys.delete(e.key.toLowerCase()));
+
+function bindZone(id, dir){
+  const el = document.getElementById(id);
+  el.addEventListener('pointerdown', e=>{ e.preventDefault(); touchSteer=dir; tapAdvance(); });
+  el.addEventListener('pointerup',   ()=>{ touchSteer=0; });
+  el.addEventListener('pointerleave',()=>{ touchSteer=0; });
+}
+bindZone('tl',-1); bindZone('tr',1);
+function tapAdvance(){ if (state==='ready') start(); else if (state==='over') start(); }
+
+document.getElementById('startBtn').onclick = start;
+document.getElementById('againBtn').onclick = start;
+
+/* ---------- audio ---------- */
+let actx, eng, engGain, filt, audioReady=false, muted=false;
+function initAudio(){
+  if (audioReady) return;
+  try{
+    actx = new (window.AudioContext||window.webkitAudioContext)();
+    eng = actx.createOscillator(); eng.type='sawtooth';
+    filt = actx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value=700;
+    engGain = actx.createGain(); engGain.gain.value=0;
+    eng.connect(filt); filt.connect(engGain); engGain.connect(actx.destination);
+    eng.frequency.value=60; eng.start(); audioReady=true;
+  }catch(e){}
+}
+function engineSound(speed,on){ if(!audioReady) return;
+  eng.frequency.setTargetAtTime(50+speed*3.0, actx.currentTime, 0.06);
+  engGain.gain.setTargetAtTime((on&&!muted)?0.05:0, actx.currentTime, 0.1);
+}
+function blip(freq,dur,type,vol){ if(!audioReady||muted) return;
+  const o=actx.createOscillator(), g=actx.createGain();
+  o.type=type||'triangle'; o.frequency.value=freq; g.gain.value=vol||0.18;
+  o.connect(g); g.connect(actx.destination); o.start();
+  g.gain.setTargetAtTime(0, actx.currentTime, dur*0.4); o.stop(actx.currentTime+dur);
+}
+function crashSound(){ if(!audioReady||muted) return;
+  const o=actx.createOscillator(), g=actx.createGain();
+  o.type='square'; o.frequency.setValueAtTime(220,actx.currentTime);
+  o.frequency.exponentialRampToValueAtTime(40,actx.currentTime+0.4);
+  g.gain.value=0.3; o.connect(g); g.connect(actx.destination); o.start();
+  g.gain.setTargetAtTime(0,actx.currentTime,0.2); o.stop(actx.currentTime+0.5);
+}
+document.getElementById('muteBtn').onclick = ()=>{
+  muted=!muted; document.getElementById('muteBtn').textContent = muted?'🔇':'🔊';
+};
+
+/* ---------- game state ---------- */
+let state='ready';            // ready | play | over
+let speed=START_SPEED, dist=0, coins=0, steer=0, lean=0;
+let best = +(localStorage.getItem('turborider.best')||0);
+document.getElementById('vBest').textContent = best;
+
+const hud = document.getElementById('hud');
+const elReady=document.getElementById('ready'), elOver=document.getElementById('over');
+
+function start(){
+  initAudio(); if (actx && actx.state==='suspended') actx.resume();
+  // reset world
+  state='play'; speed=START_SPEED; dist=0; coins=0; steer=0; lean=0;
+  bike.position.x=0; bike.rotation.z=0;
+  for (const o of movers){
+    if (o.kind==='dash') continue;
+    o.mesh.position.z = rand(20, SPAWN_FAR);
+    if (o.kind==='car') o.mesh.position.x = laneX();
+    if (o.kind==='coin') o.mesh.position.x = rand(-5,5);
+    if (o.kind==='tree') o.mesh.position.x = o.side*rand(ROAD_HALF+4, ROAD_HALF+16);
+  }
+  elReady.classList.add('hidden'); elOver.classList.add('hidden');
+  hud.style.opacity=1;
+}
+function gameOver(){
+  state='over'; crashSound(); engineSound(0,false);
+  best = Math.max(best, Math.floor(dist));
+  localStorage.setItem('turborider.best', best);
+  document.getElementById('finalDist').textContent = Math.floor(dist);
+  document.getElementById('finalCoins').textContent = coins;
+  document.getElementById('finalBest').textContent = best;
+  document.getElementById('vBest').textContent = best;
+  elOver.classList.remove('hidden');
+  hud.style.opacity=0.25;
+}
+
+/* ---------- loop ---------- */
+const clock = new THREE.Clock();
+function recycle(o){
+  const z = SPAWN_FAR + rand(0, 30);
+  o.mesh.position.z = z;
+  if (o.kind==='car'){ o.mesh.position.x = laneX(); }
+  if (o.kind==='coin'){ o.mesh.position.x = rand(-5,5); }
+  if (o.kind==='tree'){ o.mesh.position.x = o.side*rand(ROAD_HALF+4, ROAD_HALF+16); }
+}
+
+function tick(){
+  const dt = Math.min(0.05, clock.getDelta());
+
+  if (state==='play'){
+    // steering input
+    const left = keys.has('arrowleft')||keys.has('a')||touchSteer<0;
+    const right= keys.has('arrowright')||keys.has('d')||touchSteer>0;
+    const dir = (left?1:0) - (right?1:0);  // world +x is screen-left, so flip
+    bike.position.x += dir * STEER_SPEED * dt;
+    bike.position.x = Math.max(-ROAD_HALF+0.5, Math.min(ROAD_HALF-0.5, bike.position.x));
+    lean += ((-dir*0.5) - lean) * Math.min(1, dt*10);
+    bike.rotation.z = lean;
+    bike.rotation.y = -dir*0.12;
+
+    // speed (auto-accelerate, boost)
+    const boosting = keys.has('arrowup')||keys.has(' ');
+    speed = Math.min(MAX_SPEED, speed + ACCEL*dt + (boosting?BOOST*dt:0));
+    dist += speed * dt * 0.55;
+
+    // move world toward camera + collisions
+    const wheelSpin = speed * dt;
+    for (const o of movers){
+      o.mesh.position.z -= speed * dt;
+      if (o.kind==='coin'){ o.mesh.rotation.y += dt*4; o.mesh.rotation.z += dt*1.5; }
+      const cz = o.mesh.position.z;
+      if (cz < RECYCLE_BACK){
+        if (o.kind==='dash') o.mesh.position.z += DASH_N*DASH_GAP;
+        else recycle(o);
+        continue;
+      }
+      // collision window around the bike (bike at z≈0)
+      if (cz < 1.9 && cz > -1.4){
+        const dx = Math.abs(o.mesh.position.x - bike.position.x);
+        if (o.kind==='car' && dx < 1.12){ gameOver(); }
+        else if (o.kind==='coin' && dx < 1.5){ coins++; blip(900,0.12,'triangle',0.2); recycle(o); }
+      }
+    }
+    for (const w of bike.userData.wheels) w.rotateY(wheelSpin);
+    engineSound(speed, true);
+
+    hud.children[0].querySelector('#vSpeed').textContent = Math.round(speed*3.0);
+    document.getElementById('vDist').textContent = Math.floor(dist);
+    document.getElementById('vCoins').textContent = coins;
+  } else {
+    // idle bob in menu / crash
+    bike.position.y = Math.sin(performance.now()/600)*0.0; // keep grounded
+    engineSound(state==='ready'?12:0, state==='ready');
+  }
+
+  // chase camera
+  const targetCamX = bike.position.x*0.55;
+  camera.position.x += (targetCamX - camera.position.x)*Math.min(1,dt*6);
+  camera.position.y = 4.3; camera.position.z = -8.6;
+  camera.lookAt(bike.position.x*0.3, 1.25, 12);
+
+  // shadow follows bike
+  shadow.position.x = bike.position.x;
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+camera.position.set(0,4.3,-8.6);
+tick();
+</script>
+</body>
+</html>
