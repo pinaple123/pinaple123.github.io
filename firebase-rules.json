@@ -1,0 +1,18 @@
+{
+  "rules": {
+    "users": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || auth.token.email == 'eric@taaplanning.com')",
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('role').val() == 'admin' || auth.token.email == 'eric@taaplanning.com')",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || auth.token.email == 'eric@taaplanning.com' || (auth.uid == $uid && !data.exists() && newData.child('role').val() == 'user' && newData.child('banned').val() == false && newData.child('allowSecondSite').val() == false))"
+      }
+    },
+    "status": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || auth.token.email == 'eric@taaplanning.com')",
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    }
+  }
+}

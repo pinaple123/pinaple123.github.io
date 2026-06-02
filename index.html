@@ -15,12 +15,12 @@
     position: sticky; top: 0; z-index: 10;
   }
   header h1 { margin: 0; font-size: 18px; font-weight: 600; }
-  header input {
+  header input#search {
     flex: 1; max-width: 320px; padding: 8px 12px;
     background: #0e0f13; border: 1px solid #2a2d36; border-radius: 6px;
     color: #eee; font-size: 14px; outline: none;
   }
-  header input:focus { border-color: #4a90e2; }
+  header input#search:focus { border-color: #4a90e2; }
   header button {
     padding: 8px 14px; background: #2a2d36; border: 0; border-radius: 6px;
     color: #eee; cursor: pointer; font-size: 14px;
@@ -31,6 +31,11 @@
     border-radius: 6px; font-size: 14px; font-weight: 500;
   }
   header .btn-link:hover { background: #5aa3f0; }
+  header .btn-link.disabled { background: #2a2d36; color: #777; pointer-events: none; cursor: not-allowed; }
+  header .spacer { flex: 1; }
+  header .who { font-size: 13px; color: #9aa; white-space: nowrap; }
+  header .who b { color: #eee; }
+  .btn-admin { background: #b8860b !important; color: #111 !important; font-weight: 600; }
 
   .grid {
     display: grid; gap: 14px; padding: 16px;
@@ -46,9 +51,7 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 28px; font-weight: 700; color: #4a90e2;
   }
-  .card .name {
-    padding: 10px 12px; font-size: 14px; font-weight: 500;
-  }
+  .card .name { padding: 10px 12px; font-size: 14px; font-weight: 500; }
 
   #player {
     position: fixed; inset: 0; background: #000; z-index: 100;
@@ -66,15 +69,93 @@
   }
   #player .bar button:hover { background: #353944; }
   #player iframe { flex: 1; width: 100%; border: 0; background: #000; }
+
+  /* ---- Auth gate ---- */
+  #gate {
+    position: fixed; inset: 0; z-index: 1000;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(1200px 600px at 50% -10%, #1b2740, #0e0f13);
+  }
+  #gate.hidden { display: none; }
+  .card-auth {
+    width: 360px; max-width: calc(100vw - 32px);
+    background: #15171d; border: 1px solid #23262e; border-radius: 14px;
+    padding: 26px 24px; box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  }
+  .card-auth h2 { margin: 0 0 4px; font-size: 22px; }
+  .card-auth p.sub { margin: 0 0 18px; color: #8b93a3; font-size: 13px; }
+  .card-auth label { display: block; font-size: 12px; color: #9aa; margin: 12px 0 5px; }
+  .card-auth input {
+    width: 100%; padding: 10px 12px; font-size: 14px;
+    background: #0e0f13; border: 1px solid #2a2d36; border-radius: 8px; color: #eee; outline: none;
+  }
+  .card-auth input:focus { border-color: #4a90e2; }
+  .card-auth .primary {
+    width: 100%; margin-top: 18px; padding: 11px; font-size: 15px; font-weight: 600;
+    background: #4a90e2; border: 0; border-radius: 8px; color: #fff; cursor: pointer;
+  }
+  .card-auth .primary:hover { background: #5aa3f0; }
+  .card-auth .primary:disabled { opacity: .6; cursor: default; }
+  .card-auth .toggle { margin-top: 14px; text-align: center; font-size: 13px; color: #8b93a3; }
+  .card-auth .toggle a { color: #6aa8ee; cursor: pointer; text-decoration: none; }
+  .card-auth .msg { margin-top: 12px; font-size: 13px; min-height: 16px; }
+  .card-auth .msg.err { color: #ff6b6b; }
+  .card-auth .msg.ok { color: #6bd28b; }
+  .setup-note {
+    margin-top: 16px; padding: 12px; border: 1px solid #5a3; border-radius: 8px;
+    background: #0f1a12; color: #bfe; font-size: 12px; line-height: 1.5;
+  }
+
+  /* ---- Admin console ---- */
+  #admin {
+    position: fixed; inset: 0; z-index: 500; background: #0e0f13;
+    display: none; flex-direction: column;
+  }
+  #admin.open { display: flex; }
+  #admin .abar {
+    display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+    background: #15171d; border-bottom: 1px solid #23262e;
+  }
+  #admin .abar h2 { margin: 0; font-size: 17px; }
+  #admin .abar .spacer { flex: 1; }
+  #admin .wrap { flex: 1; overflow: auto; padding: 16px; }
+  table.users { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.users th, table.users td { padding: 9px 10px; text-align: left; border-bottom: 1px solid #23262e; white-space: nowrap; }
+  table.users th { color: #8b93a3; font-weight: 600; position: sticky; top: 0; background: #0e0f13; }
+  table.users td.email { white-space: normal; word-break: break-all; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .dot.on { background: #3ddc84; box-shadow: 0 0 6px #3ddc84; }
+  .dot.off { background: #555; }
+  .pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+  .pill.admin { background: #4d3a00; color: #ffcf5a; }
+  .pill.user { background: #1d2733; color: #8fb8ee; }
+  .pill.banned { background: #3a1414; color: #ff8080; }
+  table.users button {
+    padding: 5px 9px; margin: 0 2px; font-size: 12px; border: 0; border-radius: 6px;
+    cursor: pointer; background: #2a2d36; color: #eee;
+  }
+  table.users button:hover { filter: brightness(1.2); }
+  button.b-toggle { background: #1d3a5f !important; }
+  button.b-toggle.on { background: #1f6f3f !important; }
+  button.b-ban { background: #6a2222 !important; }
+  button.b-unban { background: #2a5a2a !important; }
+  button.b-kick { background: #6a4a12 !important; }
+  button.b-admin { background: #4a2a6a !important; }
+  .muted { color: #8b93a3; }
 </style>
 </head>
 <body>
 
+<!-- ============ MAIN SITE (under the gate) ============ -->
 <header>
   <h1>Games</h1>
   <input id="search" type="text" placeholder="Search…" autocomplete="off">
-  <a class="btn-link" href="https://pinaple123.github.io/aple.github.io/" target="_blank" rel="noopener" title="150+ more games (your own fork)">More Games ↗</a>
+  <span class="spacer"></span>
+  <a id="moreGames" class="btn-link disabled" href="https://pinaple123.github.io/aple.github.io/" target="_blank" rel="noopener" title="150+ more games">More Games ↗</a>
   <button onclick="cloak()" title="Open in about:blank">Cloak</button>
+  <button id="adminBtn" class="btn-admin" style="display:none">Admin</button>
+  <span class="who" id="who"></span>
+  <button id="logoutBtn" style="display:none">Log out</button>
 </header>
 
 <div class="grid" id="grid"></div>
@@ -88,9 +169,379 @@
   <iframe id="frame" allow="autoplay; fullscreen; gamepad; pointer-lock; cross-origin-isolated" allowfullscreen></iframe>
 </div>
 
+<!-- ============ ADMIN CONSOLE ============ -->
+<div id="admin">
+  <div class="abar">
+    <h2>Admin console</h2>
+    <span class="muted" id="adminCount"></span>
+    <span class="spacer"></span>
+    <button id="adminClose">Close</button>
+  </div>
+  <div class="wrap">
+    <table class="users">
+      <thead>
+        <tr>
+          <th>Status</th><th>Email</th><th>Role</th><th>Last seen</th>
+          <th>2nd site</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="userRows"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ============ AUTH GATE ============ -->
+<div id="gate">
+  <div class="card-auth">
+    <h2 id="authTitle">Sign in</h2>
+    <p class="sub">You need an account to use this site.</p>
+
+    <div id="authForm">
+      <label>Email</label>
+      <input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com">
+      <label>Password</label>
+      <input id="authPass" type="password" autocomplete="current-password" placeholder="••••••••">
+      <button class="primary" id="authSubmit">Sign in</button>
+      <div class="toggle" id="authToggle">
+        No account? <a id="toggleLink">Create one</a>
+      </div>
+      <div class="msg" id="authMsg"></div>
+    </div>
+
+    <div class="setup-note" id="setupNote" style="display:none"></div>
+  </div>
+</div>
+
+<!-- Firebase + auth + admin logic -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import {
+    getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+    signOut, onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import {
+    getDatabase, ref, set, get, update, onValue, onDisconnect, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  /* ====================================================================
+     STEP 1 — PASTE YOUR FIREBASE CONFIG HERE
+     Get it from: Firebase console → Project settings → "Your apps" (web app).
+     Also set ADMIN_EMAIL to the email you'll sign up with — that account
+     is always admin (this matches the security rules you paste in step 2).
+     ==================================================================== */
+  const firebaseConfig = {
+    apiKey:      "PASTE_API_KEY",
+    authDomain:  "PASTE_PROJECT.firebaseapp.com",
+    databaseURL: "https://PASTE_PROJECT-default-rtdb.firebaseio.com",
+    projectId:   "PASTE_PROJECT",
+    appId:       "PASTE_APP_ID"
+  };
+  const ADMIN_EMAIL = "eric@taaplanning.com";
+  /* ==================================================================== */
+
+  const gate      = document.getElementById("gate");
+  const authTitle = document.getElementById("authTitle");
+  const authEmail = document.getElementById("authEmail");
+  const authPass  = document.getElementById("authPass");
+  const authSubmit= document.getElementById("authSubmit");
+  const authMsg   = document.getElementById("authMsg");
+  const toggleLink= document.getElementById("toggleLink");
+  const authToggle= document.getElementById("authToggle");
+  const setupNote = document.getElementById("setupNote");
+  const whoEl     = document.getElementById("who");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const adminBtn  = document.getElementById("adminBtn");
+  const adminPane = document.getElementById("admin");
+  const adminClose= document.getElementById("adminClose");
+  const moreGames = document.getElementById("moreGames");
+
+  // --- If config not filled in, show setup instructions instead of crashing ---
+  if (firebaseConfig.apiKey === "PASTE_API_KEY") {
+    document.getElementById("authForm").style.display = "none";
+    setupNote.style.display = "block";
+    setupNote.innerHTML =
+      "<b>Setup needed.</b> Open <code>index.html</code> and paste your Firebase " +
+      "config into the <code>firebaseConfig</code> block near the top of the script, " +
+      "then push. See the setup steps your developer left you.";
+    throw new Error("Firebase config not set");
+  }
+
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getDatabase(app);
+
+  let mode = "signin";              // or "signup"
+  let me   = null;                  // firebase user
+  let myProfile = null;             // users/{uid} value
+  let sessionKickBaseline = null;   // kickAt value seen at login (ignore older kicks)
+  let selfUnsub = null;             // detach self listener on logout
+  let usersUnsub = null, statusUnsub = null;
+  let statusMap = {};               // uid -> {online,lastSeen}
+
+  // ---------- Auth form ----------
+  function setMode(m) {
+    mode = m;
+    authTitle.textContent = m === "signin" ? "Sign in" : "Create account";
+    authSubmit.textContent = m === "signin" ? "Sign in" : "Sign up";
+    authToggle.innerHTML = m === "signin"
+      ? 'No account? <a id="toggleLink">Create one</a>'
+      : 'Already have an account? <a id="toggleLink">Sign in</a>';
+    document.getElementById("toggleLink").onclick = () => setMode(m === "signin" ? "signup" : "signin");
+    authMsg.textContent = "";
+  }
+  toggleLink.onclick = () => setMode("signup");
+
+  function showMsg(text, kind) { authMsg.textContent = text; authMsg.className = "msg " + (kind || ""); }
+
+  authSubmit.onclick = async () => {
+    const email = authEmail.value.trim();
+    const pass  = authPass.value;
+    if (!email || !pass) { showMsg("Enter email and password.", "err"); return; }
+    if (mode === "signup" && pass.length < 6) { showMsg("Password must be at least 6 characters.", "err"); return; }
+    authSubmit.disabled = true;
+    showMsg(mode === "signin" ? "Signing in…" : "Creating account…", "");
+    try {
+      if (mode === "signin") {
+        await signInWithEmailAndPassword(auth, email, pass);
+      } else {
+        const cred = await createUserWithEmailAndPassword(auth, email, pass);
+        const isAdmin = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+        await set(ref(db, "users/" + cred.user.uid), {
+          email,
+          role: isAdmin ? "admin" : "user",
+          banned: false,
+          allowSecondSite: isAdmin ? true : false,
+          createdAt: serverTimestamp()
+        });
+      }
+    } catch (e) {
+      showMsg(prettyError(e), "err");
+    } finally {
+      authSubmit.disabled = false;
+    }
+  };
+  authPass.addEventListener("keydown", e => { if (e.key === "Enter") authSubmit.click(); });
+
+  function prettyError(e) {
+    const c = (e && e.code) || "";
+    if (c.includes("invalid-credential") || c.includes("wrong-password") || c.includes("user-not-found"))
+      return "Wrong email or password.";
+    if (c.includes("email-already-in-use")) return "That email already has an account — sign in instead.";
+    if (c.includes("invalid-email")) return "That's not a valid email.";
+    if (c.includes("weak-password")) return "Password too weak (min 6 characters).";
+    if (c.includes("too-many-requests")) return "Too many attempts — wait a bit and try again.";
+    if (c.includes("network")) return "Network error — check your connection.";
+    return (e && e.message) || "Something went wrong.";
+  }
+
+  // ---------- Auth state ----------
+  onAuthStateChanged(auth, async (user) => {
+    // clean up any prior session listeners
+    if (selfUnsub) { selfUnsub(); selfUnsub = null; }
+    if (usersUnsub) { usersUnsub(); usersUnsub = null; }
+    if (statusUnsub) { statusUnsub(); statusUnsub = null; }
+
+    if (!user) { showLoggedOut(); return; }
+    me = user;
+
+    // Ensure a profile record exists (covers accounts made before this record existed)
+    const uref = ref(db, "users/" + user.uid);
+    let snap = await get(uref);
+    if (!snap.exists()) {
+      const isAdmin = (user.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
+      await set(uref, {
+        email: user.email || "",
+        role: isAdmin ? "admin" : "user",
+        banned: false,
+        allowSecondSite: isAdmin ? true : false,
+        createdAt: serverTimestamp()
+      });
+      snap = await get(uref);
+    }
+    // Always (re)assert admin for the bootstrap email
+    if ((user.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && snap.val().role !== "admin") {
+      await update(uref, { role: "admin", allowSecondSite: true });
+    }
+
+    startPresence(user.uid);
+
+    // Listen to my own record for ban / kick / access changes
+    sessionKickBaseline = undefined;
+    selfUnsub = onValue(uref, (s) => {
+      const u = s.val();
+      if (!u) return;
+      myProfile = u;
+
+      if (u.banned) { forceOut("You have been banned from this site."); return; }
+
+      if (sessionKickBaseline === undefined) {
+        sessionKickBaseline = u.kickAt || 0;       // remember kick state at login
+      } else if ((u.kickAt || 0) > sessionKickBaseline) {
+        forceOut("You were kicked by an admin. Reloading…", true);
+        return;
+      }
+
+      applyProfileToUI(u);
+    });
+  });
+
+  function showLoggedOut() {
+    me = null; myProfile = null;
+    gate.classList.remove("hidden");
+    setMode("signin");
+    authEmail.value = ""; authPass.value = "";
+    whoEl.textContent = "";
+    logoutBtn.style.display = "none";
+    adminBtn.style.display = "none";
+    adminPane.classList.remove("open");
+    moreGames.classList.add("disabled");
+    document.getElementById("authForm").style.display = "";
+  }
+
+  function applyProfileToUI(u) {
+    gate.classList.add("hidden");
+    logoutBtn.style.display = "";
+    const admin = u.role === "admin";
+    whoEl.innerHTML = "Hi, <b>" + escapeHtml(u.email || me.email) + "</b>" + (admin ? " (admin)" : "");
+    adminBtn.style.display = admin ? "" : "none";
+    if (admin) startAdminFeed();
+    // 2nd-site gate: per-user toggle (admins always allowed)
+    if (u.allowSecondSite || admin) moreGames.classList.remove("disabled");
+    else moreGames.classList.add("disabled");
+  }
+
+  async function forceOut(message, reload) {
+    try { await goOffline(); } catch {}
+    await signOut(auth);
+    alert(message);
+    if (reload) location.reload();
+  }
+
+  logoutBtn.onclick = async () => { try { await goOffline(); } catch {} await signOut(auth); };
+
+  // ---------- Presence (online / last-seen) ----------
+  let myStatusRef = null;
+  function startPresence(uid) {
+    myStatusRef = ref(db, "status/" + uid);
+    const connRef = ref(db, ".info/connected");
+    onValue(connRef, (s) => {
+      if (s.val() === false) return;
+      onDisconnect(myStatusRef).set({ online: false, lastSeen: serverTimestamp() }).then(() => {
+        set(myStatusRef, { online: true, lastSeen: serverTimestamp() });
+      });
+    });
+  }
+  async function goOffline() {
+    if (myStatusRef) await set(myStatusRef, { online: false, lastSeen: serverTimestamp() });
+  }
+
+  // ---------- Admin console ----------
+  adminBtn.onclick = () => adminPane.classList.add("open");
+  adminClose.onclick = () => adminPane.classList.remove("open");
+
+  let usersMap = {};
+  function startAdminFeed() {
+    if (usersUnsub || statusUnsub) return;
+    usersUnsub  = onValue(ref(db, "users"),  (s) => { usersMap = s.val() || {}; renderUsers(); });
+    statusUnsub = onValue(ref(db, "status"), (s) => { statusMap = s.val() || {}; renderUsers(); });
+  }
+
+  function renderUsers() {
+    const tbody = document.getElementById("userRows");
+    const uids = Object.keys(usersMap);
+    document.getElementById("adminCount").textContent = uids.length + " user" + (uids.length === 1 ? "" : "s");
+    tbody.innerHTML = "";
+    // sort: online first, then by email
+    uids.sort((a, b) => {
+      const oa = (statusMap[a] && statusMap[a].online) ? 0 : 1;
+      const ob = (statusMap[b] && statusMap[b].online) ? 0 : 1;
+      if (oa !== ob) return oa - ob;
+      return (usersMap[a].email || "").localeCompare(usersMap[b].email || "");
+    });
+    for (const uid of uids) {
+      const u = usersMap[uid];
+      const st = statusMap[uid] || {};
+      const online = !!st.online;
+      const isMe = uid === me.uid;
+      const isAdmin = u.role === "admin";
+      const allowed = !!u.allowSecondSite || isAdmin;
+
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td><span class="dot ' + (online ? "on" : "off") + '"></span>' + (online ? "Online" : "Offline") + '</td>' +
+        '<td class="email">' + escapeHtml(u.email || "(no email)") + (isMe ? ' <span class="muted">(you)</span>' : "") + '</td>' +
+        '<td>' + (u.banned ? '<span class="pill banned">banned</span> ' : "") +
+                 '<span class="pill ' + (isAdmin ? "admin" : "user") + '">' + (isAdmin ? "admin" : "user") + '</span></td>' +
+        '<td class="muted">' + (online ? "now" : timeAgo(st.lastSeen)) + '</td>' +
+        '<td><button class="b-toggle ' + (allowed ? "on" : "") + '" data-act="site" data-uid="' + uid + '"' + (isAdmin ? " disabled title='admins always allowed'" : "") + '>' +
+            (allowed ? "Allowed ✓" : "Blocked") + '</button></td>' +
+        '<td>' +
+          (isMe ? '<span class="muted">—</span>' :
+            (u.banned
+              ? '<button class="b-unban" data-act="unban" data-uid="' + uid + '">Unban</button>'
+              : '<button class="b-ban" data-act="ban" data-uid="' + uid + '">Ban</button>') +
+            '<button class="b-kick" data-act="kick" data-uid="' + uid + '"' + (online ? "" : " disabled") + '>Kick</button>' +
+            '<button class="b-admin" data-act="role" data-uid="' + uid + '">' + (isAdmin ? "Remove admin" : "Make admin") + '</button>'
+          ) +
+        '</td>';
+      tbody.appendChild(tr);
+    }
+    tbody.querySelectorAll("button[data-act]").forEach(btn => {
+      btn.onclick = () => adminAction(btn.dataset.act, btn.dataset.uid);
+    });
+  }
+
+  async function adminAction(act, uid) {
+    const u = usersMap[uid] || {};
+    const uref = ref(db, "users/" + uid);
+    try {
+      if (act === "site") {
+        await update(uref, { allowSecondSite: !u.allowSecondSite });
+      } else if (act === "ban") {
+        if (!confirm("Ban " + (u.email || uid) + "? They'll be logged out and can't sign back in.")) return;
+        await update(uref, { banned: true, kickAt: serverTimestamp() });
+      } else if (act === "unban") {
+        await update(uref, { banned: false });
+      } else if (act === "kick") {
+        await update(uref, { kickAt: serverTimestamp() });
+      } else if (act === "role") {
+        const makeAdmin = u.role !== "admin";
+        if (!confirm((makeAdmin ? "Make " : "Remove admin from ") + (u.email || uid) + "?")) return;
+        await update(uref, { role: makeAdmin ? "admin" : "user" });
+      }
+    } catch (e) {
+      alert("Action failed: " + (e.message || e));
+    }
+  }
+
+  // ---------- helpers ----------
+  function timeAgo(ts) {
+    if (!ts) return "never";
+    const diff = Date.now() - ts;
+    if (diff < 0) return "just now";
+    const s = Math.floor(diff / 1000);
+    if (s < 60) return s + "s ago";
+    const m = Math.floor(s / 60);
+    if (m < 60) return m + "m ago";
+    const h = Math.floor(m / 60);
+    if (h < 24) return h + "h ago";
+    const d = Math.floor(h / 24);
+    if (d < 30) return d + "d ago";
+    return new Date(ts).toLocaleDateString();
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  }
+
+  // leave-clean presence on tab close
+  window.addEventListener("beforeunload", () => { if (myStatusRef) set(myStatusRef, { online: false, lastSeen: Date.now() }); });
+
+  setMode("signin");
+</script>
+
+<!-- Game grid / player logic (unchanged behaviour) -->
 <script>
   // Self-hosted games: each lives at games/<path>/index.html in this same repo.
-  // No third-party providers — bulletproof, can never be blocked.
   const GAMES = [
     { name: "Turbo Rider (3D Bike)", url: "motorbike.html",  icon: "🏍️" },
     { name: "Block Game Maker",      url: "game-maker.html", icon: "🧩" },
@@ -132,9 +583,7 @@
     frame.src = "about:blank";
   }
 
-  function fs() {
-    if (frame.requestFullscreen) frame.requestFullscreen();
-  }
+  function fs() { if (frame.requestFullscreen) frame.requestFullscreen(); }
 
   function cloak() {
     const w = window.open("about:blank", "_blank");
@@ -145,6 +594,9 @@
       </head><body><iframe src="${location.href}" allowfullscreen allow="autoplay; fullscreen; gamepad; pointer-lock"></iframe></body></html>`);
     w.document.close();
   }
+
+  // expose inline-handler functions
+  window.cloak = cloak; window.fs = fs; window.closePlayer = closePlayer;
 
   search.oninput = e => render(e.target.value);
   document.addEventListener("keydown", e => { if (e.key === "Escape") closePlayer(); });
