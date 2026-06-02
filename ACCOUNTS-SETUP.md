@@ -23,7 +23,7 @@ You have to create the free Firebase project yourself (the keys must be yours).
 ## 4. Paste the security rules
 1. In Realtime Database → **Rules** tab.
 2. Delete what's there, paste the entire contents of **`firebase-rules.json`** (in this repo), **Publish**.
-   - These rules make `eric@taaplanning.com` permanently admin and stop anyone
+   - These rules make `taamatthewpuvis@gmail.com` permanently admin and stop anyone
      from making themselves admin, banning others, or reading other users.
    - If you want a different admin email, change it in **both** `firebase-rules.json`
      (3 places) **and** `index.html` (`ADMIN_EMAIL`), then re-publish + re-push.
@@ -40,7 +40,7 @@ You have to create the free Firebase project yourself (the keys must be yours).
 3. Save, commit, push.
 
 ## 7. First login = your admin account
-1. Open the live site → **Create one** → sign up with **`eric@taaplanning.com`**.
+1. Open the live site → **Create one** → sign up with **`taamatthewpuvis@gmail.com`**.
 2. That account is automatically admin → you'll see the gold **Admin** button.
 3. Anyone else who signs up is a normal user, blocked from the 2nd site until you allow them.
 
