@@ -148,6 +148,15 @@ onAuthStateChanged(auth, async (user) => {
     await update(uref, { role: "admin", allowSecondSite: true });
   }
 
+  // Blocked at the door: banned or deleted accounts can't get back in.
+  // (Delete keeps a banned tombstone precisely so re-login is refused here —
+  //  the record still exists, so the recreate-fresh-profile path above is skipped.)
+  const prof0 = snap.val() || {};
+  if (prof0.banned || prof0.deleted) {
+    forceOut(prof0.deleted ? "This account has been deleted." : "You have been banned from this site.");
+    return;
+  }
+
   startPresence(user.uid);
 
   sessionKickBaseline = undefined;
@@ -244,8 +253,11 @@ function startAdminFeed() {
 function renderUsers() {
   const tbody = document.getElementById("userRows");
   if (!tbody) return;
-  const uids = Object.keys(usersMap);
-  document.getElementById("adminCount").textContent = uids.length + " user" + (uids.length === 1 ? "" : "s");
+  const allUids = Object.keys(usersMap);
+  const uids = allUids.filter(uid => !usersMap[uid].deleted);   // deleted accounts are hidden but kept as banned tombstones
+  const deletedCount = allUids.length - uids.length;
+  document.getElementById("adminCount").textContent =
+    uids.length + " user" + (uids.length === 1 ? "" : "s") + (deletedCount ? " · " + deletedCount + " deleted" : "");
   tbody.innerHTML = "";
   uids.sort((a, b) => {
     const oa = (statusMap[a] && statusMap[a].online) ? 0 : 1;
@@ -324,11 +336,16 @@ async function adminAction(act, uid) {
       if (!kind) return;
       await update(uref, { cmd: { type: "troll", kind: kind.trim().toLowerCase(), at: serverTimestamp() } });
     } else if (act === "del") {
-      if (!confirm("Delete " + (u.email || uid) + "?\n\nRemoves their account record and logs them out. " +
-                   "(Note: if they sign in again with the same email/password they reappear as a new user — " +
-                   "fully deleting the login needs the Firebase Admin SDK, which a static site can't run. " +
-                   "Use Ban to keep someone out for good.)")) return;
-      await remove(ref(db, "users/" + uid));
+      if (!confirm("Delete " + (u.email || uid) + "?\n\nThey'll be logged out, removed from this list, and CAN'T sign back in.")) return;
+      // A static site can't erase the Firebase Auth login, so we leave a banned
+      // "tombstone": the record stays (hidden from the list) with deleted:true,
+      // which makes the sign-in path above refuse them every time. Permanent.
+      await update(uref, {
+        banned: true,
+        deleted: true,
+        allowSecondSite: false,
+        kickAt: serverTimestamp()
+      });
       try { await remove(ref(db, "status/" + uid)); } catch {}
     }
   } catch (e) {
